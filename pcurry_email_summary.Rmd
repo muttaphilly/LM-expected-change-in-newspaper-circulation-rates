@@ -1,0 +1,55 @@
+---
+title: "PCurry_a2_scaffolded_email"
+author: "P_Curry"
+date: "`r Sys.Date()`"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+#Packages for PDF knit
+install.packages('tinytex')
+tinytex::install_tinytex()
+tinytex::tlmgr_install(c("amsfonts", "babel", "csquotes", "ec", "etex", "fancyhdr", "fontspec", "geometry", "graphics", "hyperref", "ifluatex", "ifxetex", "l3backend", "l3kernel", "l3packages", "latex", "latex-amsmath-dev", "latex-graphics-dev", "latex-tools-dev", "lua-alt-getopt", "lua-fpl", "lua-visual-debug", "luatex", "metafont", "mfware", "pdftexcmds", "url", "xcolor"))
+
+
+
+#Email Summary
+
+```{r}
+cat(
+"
+Subject: Statistical Analysis of the Effects of Pulitzer Prizes on Magazine Circulation Volume
+
+Hello Mr Bossy McBossFace, 
+
+Following on from our earlier conversation, I´ve now completed the requested analysis on potential effects of Pulitzer Prize awards on magazine circulation. Please find below responses to your three key questions.
+
+
+ 1) Circulation
+To understand the effect, if any, of Pulitzer Prizes on circulation, a linear regression model was created (avg_circ_model). The results revealed a strong statistical relationship: magazines awarded more Pulitzer Prizes have a larger circulation volume (summary(avg_circ_model).
+      
+ 2) Circulation spread during prize periods
+A linear regression model (change_413_model) was created to investigate short-term effects, if any, of a Pulitzer Prize award on magazine circulation. The results here are more complex (summary(change_413_model)). A positive relationship is observed; however, there is a general strong downward trend evident in the overall data. It should also be noted there were several linear regression assumption violations in this model see- (plot(change_413_model, which = 1), plot(change_413_model, which = 3), plot(change_413_model, which = 2)). Results here should be treated with caution.
+      
+
+3) Effects of Investment in Investigative Journalism on Magazine Circulation:
+Investment scenarios were predicted for 3, 25, and 50 Pulitzer Prizes (predicted_circ_avg). These scenarios were selected to simulate business situations for a dramatic reduction, business as usual, and a dramatic increase in investment in investigative journalism.
+
+Effects of investment on circulation volume:       
+                       Circulation  Difference from predicted average
+Reduced Investment     269787       -76119
+Business as Usual      367773       21867
+Increased Investment   522982       177076
+
+
+Finally, there is clearly a bigger underlying issue than the scope of this analysis: the widespread industry decline in circulation from 2004 to 2013 (Newspaper Circulation Changes: 2004 to 2013). This is potentially linked to the advent of digital media on print circulation, an event for which there is insufficient data in the current models to build an accurate picture of the industry landscape. Additional data collection and model refinement to reflect this expanded data is highly recommended.
+
+Please let me know should you have any further queries. More than happy to expand on any of the content or chat as needed.
+
+Kind Regards,
+Philip
+
+")
+```
