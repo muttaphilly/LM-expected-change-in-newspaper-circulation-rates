@@ -1,0 +1,273 @@
+---
+title: "pcurry_a2_scaffolded_case_study"
+author: "P_Curry"
+date: "`r Sys.Date()`"
+output: html_document
+pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Load data and inspect data
+
+```{r}
+#Load packages and parse csv
+library(tidyverse)
+pacman::p_load(caret)
+
+#Save filepath to variable
+file_path <- "/Users/mudaphilly/code/UoA/Data Taming/Assingment 2 - Scaffolded case study/pulitzer.csv"
+
+#Parse csv
+pulitzer_raw <- read.csv(file_path)
+pulitzer_tibble <- as_tibble(pulitzer_raw)
+head(pulitzer_raw)
+```
+
+```{r}
+# Check for Boston Sun-Times
+boston_only <- pulitzer_raw %>%
+  filter(grepl("Boston", newspaper, ignore.case = TRUE))
+boston_only
+# There is no Boston Sun-Times in the dataset. 
+# Question says it wins Pulitzer every year
+cat("Assumption 1: Analyse Boston Globe as there are mutiple Pulitzer prize values")
+```
+# Question One: Reading and Cleaning
+
+#1.1 Recode the change_0413 variable so it represents the percentage change in circulation between 2004 and 2013 as an integer. This will require manipulating the strings in change_0413.
+
+```{r}
+# Use mutate() to refactor, sub() to remove % characters
+pulitzer_clean <- mutate(pulitzer_raw,
+  change_0413 = as.integer(sub("%", "", change_0413))
+  )
+head(pulitzer_clean)
+```
+#1.2 Append a new variable to the tibble which contains the average of circ_2004 and circ_2013.
+
+```{r}
+# add avg_circ column
+pulitzer_clean <- pulitzer_clean %>%
+  mutate(avg_circ = as.integer((circ_2004 + circ_2013) / 2))
+# remove any NAs in dataframe
+pulitzer_clean <- na.omit(pulitzer_clean)
+#tame column order
+pulitzer_clean <- select(pulitzer_clean, "newspaper", "circ_2004", "circ_2013", "avg_circ", "change_0413", "prizes_9014")
+head(pulitzer_clean)
+```
+
+#Question Two: Univariate Summary and Transformation
+
+#2.1 Describe the distribution of the variable representing average circulation, including shape, location, spread and outliers.
+```{r}
+#Visualise data. Categorical v quantitative variable, histogram was more appropriate than a scatterplot here. Use fct_reorder to identify trends.
+pulitzer_clean %>%
+  ggplot(aes(x = newspaper, , y = avg_circ)) +
+  geom_histogram(stat = "identity", color = "white") +
+  theme(axis.text.x = element_text(angle = -90, vjust = 0.5, hjust=0)) +
+  labs(x = "Newspaper", y = "Average Circulation", title = "Average Circulation by Newspaper")
+```
+
+```{r}
+# Summarise
+summary(pulitzer_clean$avg_circ)
+sd(pulitzer_clean$avg_circ)
+
+cat("
+The data is left skewed, with a second central peak. The mean (412,442) is effected by some large outliers in the data. Median (298,851) is going to be a more appropriate measure of the data´s central point on this occasion. For spread, there is a large range between Q1(213,508) and Q3(436,152), with a long tail left evident due to large outliers. The IQR was 222,644 (436152 - 213508). This further indicates the excistance of variability in the dataset.
+
+The are 3 outliers of high circulation (Wall Street Journal, USA today and New York Times).
+
+")
+```
+# 2.2 Describe the distribution of change_0413, including shape, location, spread and outliers.
+
+```{r}
+#Visualise data
+avg_circ_graph <- pulitzer_clean %>%
+  mutate(change_color = ifelse(change_0413 >= 0, "black", "red"))
+
+ggplot(avg_circ_graph, aes(x = newspaper, , y = change_0413, fill = change_color)) +
+  geom_histogram(stat = "identity", color = "white") +
+   scale_fill_manual(values = c("black", "red")) +
+  theme(axis.text.x = element_text(angle = -90, vjust = 0.5, hjust=0)) +
+  labs(x = "Newspaper", 
+       y = "2004-2013 Change(%)",
+       fill = "Trend",
+       title = "Newspaper Circulation Changes: 2004 to 2013")
+```
+
+```{r}
+#Summarise
+summary(pulitzer_clean$change_0413)
+sd(pulitzer_clean$change_0413)
+
+cat(" 
+The change_0413 variable is quite symmetrical, uniform and has negative values. The 6 postive values are rare enough to be considered outliers (Denver Post, New York Times, Orange County Register, Seattle Times & Wall Street Journal). There are also 2 negative outliers of 100% (New Orleans Times & Rocky Mountain News). This likely means they went out of business. 
+
+The mean (-29.2) is influenced by large outliers. The median (-32.5) will again be a more appropriate interpretation of the data´s central data. 
+There is a somewhat small range between the Q1 (-40) and the Q3 (-20). This confirms the there is more uniformity for this variable.
+")
+```
+#2.3 Do either of change_0413 and the variable representing average circulation have a skew that could be resolved by a log transform? For each variable, select whether it should be transformed.
+
+```{r}
+cat("
+change_0413 is symmetrical and has centrally located data. There is no need to transform this variable. 
+
+The avg_circ variable is left skewed and therefore worth considering normalising by applying a log transformation. A common log transformation would be useful here (log_avg_circ)
+")
+
+# Common transform avg_circ
+log_avg_circ <- log(pulitzer_clean$avg_circ)
+# Visualising the transformed data
+ggplot(pulitzer_clean, aes(x = fct_reorder(newspaper, log_avg_circ), y = log_avg_circ)) +
+  geom_point() +
+  labs(x = "Newspaper", y = "log_avg_circ", title = "Newspaper Average Circulation(log)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = -90, vjust = 0.5, hjust = 0))
+
+```
+# Question Three: Model building and interpretation
+
+#3.1 Build a model predicting the variable representing a newspaper’s circulation using prizes_9014, incorporating a log transform for the average circulation if you decided this was necessary. State and interpret the slope and intercept of this model in context. Is there a statistically significant relationship between the number of Pulitzer Prizes, and average circulation?
+
+```{r}
+#predictor and responce model
+avg_circ_model <- lm(log(avg_circ) ~ prizes_9014, data = pulitzer_clean)
+summary(avg_circ_model)
+```
+
+```{r}
+# Summarise and interpret model
+cat("
+The intercept is 12.463142, this refers to expected average circulation when there are zero Pulitzer prizes. The model slope is 0.014083, this is what we expect the log change for per single Pulitzer prize. The p-values are both smaller than 0.05 so the null hypothesis is rejected. Both are therefore statistically significant.
+")
+```
+
+#3.2 Build a model predicting change_0413 using prizes_9014, incorporating a log transform forchange_0413 if you decided this was necessary. State and interpret the slope and intercept of this model in context. Is there a statistically significant relationship between the number of Pulitzer Prizes, and change in circulation?
+
+```{r}
+#predictor and responce model
+change_413_model <- lm(change_0413 ~ prizes_9014, data = pulitzer_clean)
+summary(change_413_model)
+```
+
+```{r}
+# Summarise and interpret model
+cat("
+The intercept is -35.4152. This refers to what the average circulation is at zero Pulitzer prizes. The model slope is 0.3870, this is what we expect the log change to be for 1 Pulitzer prize. The p-value for the intercept is very small (1.21e-10) and therefore has a strong statistical signficance. The slope is not as strong (0.0121) but still below 0.05. We reject the null hypothesis for both.
+")
+```
+#3.3 Check the assumptions of both linear models. Recall that there are four assumptions for each model.
+
+```{r}
+# Produce linear model assumption graphs
+
+# Linearity
+plot(avg_circ_model, which = 1)
+plot(change_413_model, which = 1)
+
+# Homosedasticity 
+plot(avg_circ_model, which = 3)
+plot(change_413_model, which = 3)
+
+# Normality
+plot(avg_circ_model, which = 2)
+plot(change_413_model, which = 2)
+```
+
+```{r}
+cat("
+For the avg_circ_model there are violations in normality. Once normality is addressed, this would be the preferred model to move forward with.
+
+For the change_413_model. There are violations in linearity, homoscedasticity and normality.
+
+The very strong negative trend evident in change_413 indicates something much bigger is going on than the effect of Pulitzer prizes on circulation. The changing landscape from print to digital media is clearly effecting the data. Including more recent data would prove insightful for increasing model accuracies in the current business landscape.
+")
+```
+# Question Four: Prediction
+
+# 4.1 Using the model from Question 3(a), calculate the expected circulation of the newspaper under each of the three proposed strategic directions. How does this compare with the current circulation?
+
+```{r}
+# Get average circulation for Boston Globe
+boston_sun_times_avg_circ <- pulitzer_clean %>%
+  filter(newspaper == "Boston Globe") %>%
+  select(avg_circ)
+# Set circulation variable
+current_circ <- 345906
+# Create tibble with 3, 25 & 50 Pulitzer Prizes
+new_pulitzers <- tibble(
+prizes_9014 = c(3,25,50)
+)
+new_pulitzers <- new_pulitzers %>%
+  mutate_all(as.integer)
+# Predict using avg_circ model. Remove the log, convert to integer, merge then create difference column
+predicted_circ_avg <- predict(avg_circ_model, newdata = new_pulitzers) %>%
+  exp() %>%
+  as.integer() %>%
+  as_tibble() %>%
+  cbind(new_pulitzers, .) %>%
+  mutate(diff = as.integer(value - current_circ))
+# Run the model
+predicted_circ_avg
+cat("
+Under a direction 1, 3 Pulitzer scenario sales will drop 76,119 from average. For Scenario 2 (25 prizes), sales increase 21,867 and under Scenario 3 (50 prizes) an increase of 177,076 is expected.
+")
+```
+
+#4.2 Using the model from Question 3(b), calculate the change in circulation of the newspaper, across the next decade, under each of the three proposed strategic directions. Comment on whether the projections of each of the two models are consistent.
+
+```{r}
+# Use mean for BG circulation. Save to variable
+next_decade <- mean(pulitzer_clean[pulitzer_clean$newspaper == "Boston Globe", "change_0413"])
+# Predicted values, convert to integer, merge then interpolate values into new column. Save to variable
+predicted_0413 <- predict(change_413_model, newdata = new_pulitzers) %>%
+  as.integer() %>%
+  as_tibble() %>%
+  cbind(new_pulitzers, .) %>%
+  mutate(percentage_change = as.integer(value - next_decade))
+#Run the model
+predicted_0413
+cat("
+Under Direction 1 (3 Prizes) sales will increase 11%. In the Direction 2 (25 Prizes) scenario, sales increase 20% and under Direction 3 (50 Prizes) sales increase of 29% are expected.
+")
+```
+#4.3 Using the model from Question 3(a), calculate 90% confidence intervals for the expected circulation of the newspaper under each of the three proposed strategic directions. Place these confidence intervals in a table and contrast them in context.
+
+```{r}
+# Use predict function. Add confidence parameter and prediction parameters. Save to variable
+avg_circ_confidence <- predict(avg_circ_model, newdata = new_pulitzers, interval = "confidence", level = 0.90)
+avg_circ_confidence
+
+cat("
+Under Direction 1, the prediction is expected to be 12.50539 with a 90% confidence interval between 12.36953 and 12.64125
+Under Direction 2, the prediction is expected to be 12.81522 with a 90% confidence interval between 12.68766 and 12.94279
+Under Direction 3, the prediction is expected to be 13.16730 with a 90% confidence interval between 12.96207 and 13.37253
+
+In the context of the avg_circ_model, the confidence level ranges indicate the model is quite precise.
+")
+
+```
+#4.4 Using the model from Question 3(b), calculate 90% prediction intervals for the expectedchange in circulation of the newspaper under each of the three proposed strategic directions. Place these prediction intervals in a table and contrast them in context.
+
+```{r}
+predicted_413_model <- predict(change_413_model, newdata = new_pulitzers, interval = "prediction", level = 0.90)
+predicted_413_model
+
+cat("
+Under Direction 1, the predicted value for change_0413 is -34.25, with a 90% prediction interval ranging from -77.73 to 9.22.
+
+Under Direction 2, the predicted value for change_0413 is -25.74, with a 90% prediction interval ranging from -69.15 to 17.67.
+
+Under Direction 3, the predicted value for change_0413 is -16.07, with a 90% prediction interval ranging from -60.23 to 28.10.
+
+In context of the change_413_model, these predication ranges are large and indicate uncertainity in the model. The predicted values in there current state are not precise. This suggests further refienment of the model or the addition of more recent data should be considered. 
+
+")
+
+```
